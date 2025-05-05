@@ -38,6 +38,20 @@ RUN sed -i 's/ -pb//g' quick_start.py && \
     sed -i 's|./binvox|xvfb-run ./binvox|g' quick_start.py && \
     sed -i 's/^[[:space:]]*img = show_obj_skel(.*)$/        pass/' quick_start.py
 
+######## Blender ########
+
+RUN apt update && apt install -y \
+    wget xz-utils libx11-6 libxi6 \
+    libxrender1 libxxf86vm1 libxfixes3 \
+    libxkbcommon0 libsm6 libgl1 libegl1 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /
+RUN wget https://mirror.freedif.org/blender/release/Blender4.4/blender-4.4.3-linux-x64.tar.xz && \
+    tar -xvf blender-4.4.3-linux-x64.tar.xz && \
+    mv blender-4.4.3-linux-x64 blender && \
+    rm blender-4.4.3-linux-x64.tar.xz
+
 ######## FastAPI ########
 
 # Install uv
@@ -52,5 +66,7 @@ WORKDIR /app
 COPY . .
 
 RUN uv sync --locked
+
+######## Run ########
 
 CMD ["uv", "run", "uvicorn", "main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
