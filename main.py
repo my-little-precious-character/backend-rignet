@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
 import os
+import subprocess
 from typing import Dict
 from uuid import uuid4
 from dotenv import load_dotenv
@@ -134,3 +135,25 @@ async def get_image_result(task_id: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(path, media_type="application/octet-stream", filename=os.path.basename(path))
+
+@app.get("/test")
+async def run_rignet():
+    try:
+        result = subprocess.run(
+            ["/usr/local/bin/python", "quick_start.py"],
+            cwd="/workspace/RigNet",
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return {
+            "status": "success",
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+    except subprocess.CalledProcessError as e:
+        return {
+            "status": "error",
+            "stdout": e.stdout,
+            "stderr": e.stderr,
+        }
