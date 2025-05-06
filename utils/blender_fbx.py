@@ -3,13 +3,20 @@ import os
 import sys
 
 ######## configuration ########
-BASE_PATH    = "/home/younghoc/Downloads/capstone-data/quick_start"
-MODEL_ID     = "17872"
+
+argv = sys.argv
+if len(argv) < 2:
+    print("Usage: blender --background --python script.py -- <BASE_PATH> <MODEL_ID>")
+    sys.exit(1)
+
+BASE_PATH = argv[0] # "/home/younghoc/Downloads/capstone-data/quick_start"
+MODEL_ID = argv[1]  # "17872"
 OBJ_PATH     = os.path.join(BASE_PATH, f"{MODEL_ID}_ori.obj")
 RIG_TXT_PATH = os.path.join(BASE_PATH, f"{MODEL_ID}_ori_rig.txt")
 OUTPUT_FBX   = os.path.join(BASE_PATH, f"{MODEL_ID}.fbx")
 
 ######## utilities ########
+
 def clear_scene():
     """Remove all objects from the scene."""
     bpy.ops.object.select_all(action='SELECT')
@@ -53,6 +60,7 @@ def parse_rig_txt(path):
     return root_name, joint_pos, joint_hier, skin_data
 
 ######## main ########
+
 def main():
     # 1) Clear scene
     clear_scene()
