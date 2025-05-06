@@ -73,6 +73,22 @@ async def handle_rigging(task):
         rig_txt_dst = os.path.join(UPLOAD_DIR, f"{task.id}_ori_rig.txt")
         shutil.copyfile(rig_txt_src, rig_txt_dst)
 
+        # Combind obj and rig result
+        blender_proc = await asyncio.create_subprocess_exec(
+            "/blender/blender", "--background", "--python", "utils/blender_fbx.py", "--", "uploads", task.id,
+            cwd="/app",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        task_progress[task.id] = "processing (90%)"
+        b_stdout, b_stderr = await blender_proc.communicate()
+
+        # Check exit code
+        if blender_proc.returncode != 0:
+            task_progress[task.id] = "error"
+            print(f"[{task.id}] blender error:\n{b_stderr.decode()}")
+            return
+
     except Exception as e:
         task_progress[task.id] = "error"
         print(f"[{task.id}] Exception: {e}")

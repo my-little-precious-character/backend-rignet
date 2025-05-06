@@ -9,9 +9,9 @@ if len(argv) < 2:
     print("Usage: blender --background --python script.py -- <BASE_PATH> <MODEL_ID>")
     sys.exit(1)
 
-BASE_PATH = argv[1] # "/home/younghoc/Downloads/capstone-data/quick_start"
-MODEL_ID = argv[2]  # "17872"
-OBJ_PATH     = os.path.join(BASE_PATH, f"{MODEL_ID}_ori.obj")
+BASE_PATH = argv[5] # "/home/younghoc/Downloads/capstone-data/quick_start"
+MODEL_ID = argv[6]  # "17872"
+OBJ_PATH     = os.path.join(BASE_PATH, f"{MODEL_ID}_mesh.obj")
 RIG_TXT_PATH = os.path.join(BASE_PATH, f"{MODEL_ID}_ori_rig.txt")
 OUTPUT_FBX   = os.path.join(BASE_PATH, f"{MODEL_ID}.fbx")
 
