@@ -32,9 +32,6 @@ load_dotenv()
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-RESULT_DIR = os.getenv("RESULT_DIR", "results")
-os.makedirs(RESULT_DIR, exist_ok=True)
-
 ######## global variables ########
 
 # queue & task
@@ -49,7 +46,7 @@ async def handle_rigging(task):
 
     try:
         # Copy obj file to rig
-        src = os.path.join("uploads", f"{task.id}_mesh.obj")
+        src = os.path.join(UPLOAD_DIR, f"{task.id}_mesh.obj")
         dst = os.path.join("/workspace/RigNet/quick_start", f"{task.id}_ori.obj")
         shutil.copyfile(src, dst)
 
@@ -73,7 +70,7 @@ async def handle_rigging(task):
 
         # Copy rig output to results dir
         rig_txt_src = os.path.join("/workspace/RigNet/quick_start", f"{task.id}_ori_rig.txt")
-        rig_txt_dst = os.path.join("results", f"{task.id}_ori_rig.txt")
+        rig_txt_dst = os.path.join(UPLOAD_DIR, f"{task.id}_ori_rig.txt")
         shutil.copyfile(rig_txt_src, rig_txt_dst)
 
     except Exception as e:
