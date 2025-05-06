@@ -154,7 +154,7 @@ async def upload_image(
         f.write(await mtl.read())
 
     # Save the albedo texture
-    alb_path   = os.path.join(UPLOAD_DIR, f"{task_id}_mesh_albedo.mtl")
+    alb_path   = os.path.join(UPLOAD_DIR, f"{task_id}_mesh_albedo.png")
     with open(alb_path, "wb") as f:
         f.write(await albedo.read())
 
