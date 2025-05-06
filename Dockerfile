@@ -36,7 +36,11 @@ RUN sed -i 's/ -pb//g' quick_start.py && \
     sed -i 's/"cuda:0" if torch.cuda.is_available() else //g' quick_start.py && \
     sed -i "s/torch.load(\([^,)]*\))/torch.load(\1, map_location='cpu')/g" quick_start.py && \
     sed -i 's|./binvox|xvfb-run ./binvox|g' quick_start.py && \
-    sed -i 's/^[[:space:]]*img = show_obj_skel(.*)$/        pass/' quick_start.py
+    sed -i 's/^[[:space:]]*img = show_obj_skel(.*)$/        pass/' quick_start.py && \
+    sed -i '/^import /a import sys' quick_start.py && \
+    sed -i '/17872/s/^/## /' quick_start.py && \
+    sed -i '/^## .*17872.*/a \    model_id = sys.argv[1]\n\    bandwidth = 0.045\n\    threshold = 0.75e-5' quick_start.py
+
 
 ######## Blender ########
 

@@ -161,7 +161,7 @@ async def get_image_result(task_id: str):
 async def run_rignet():
     try:
         result = subprocess.run(
-            ["/usr/local/bin/python", "quick_start.py"],
+            ["/usr/local/bin/python", "quick_start.py", "17872"],
             cwd="/workspace/RigNet",
             capture_output=True,
             text=True,
