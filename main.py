@@ -4,9 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 import os
 import shutil
-import subprocess
 from typing import Dict
-from uuid import uuid4
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
