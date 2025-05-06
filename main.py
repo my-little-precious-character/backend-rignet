@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
 import os
+import shutil
 import subprocess
 from typing import Dict
 from uuid import uuid4
@@ -43,6 +44,42 @@ task_result_paths: Dict[str, str] = {}  # [task_id, file path]
 
 ######## worker ########
 
+async def handle_rigging(task):
+    task_progress[task.id] = "processing (10%)"
+
+    try:
+        # Copy obj file to rig
+        src = os.path.join("uploads", f"{task.id}_mesh.obj")
+        dst = os.path.join("/workspace/RigNet/quick_start", f"{task.id}_ori.obj")
+        shutil.copyfile(src, dst)
+
+        # Rig
+        proc = await asyncio.create_subprocess_exec(
+            "/usr/local/bin/python", "quick_start.py", task.id,
+            cwd="/workspace/RigNet",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        # Wait the subprocess
+        task_progress[task.id] = "processing (50%)"
+        stdout, stderr = await proc.communicate()
+
+        # Check exit code
+        if proc.returncode != 0:
+            task_progress[task.id] = "error"
+            print(f"[{task.id}] STDERR:\n{stderr.decode()}")
+            return
+
+        # Copy rig output to results dir
+        rig_txt_src = os.path.join("/workspace/RigNet/quick_start", f"{task.id}_ori_rig.txt")
+        rig_txt_dst = os.path.join("results", f"{task.id}_ori_rig.txt")
+        shutil.copyfile(rig_txt_src, rig_txt_dst)
+
+    except Exception as e:
+        task_progress[task.id] = "error"
+        print(f"[{task.id}] Exception: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async def worker():
@@ -51,7 +88,7 @@ async def lifespan(app: FastAPI):
             task_progress[task.id] = "processing"
             try:
                 if task.type == TaskType.RIGGING:
-                    pass    # TODO: 실제 처리
+                    await handle_rigging(task)
                 elif task.type == TaskType.RIGGING_TEST:
                     for i in range(100):
                         await asyncio.sleep(0.01)
@@ -156,25 +193,3 @@ async def get_image_result(task_id: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(path, media_type="application/octet-stream", filename=os.path.basename(path))
-
-@app.get("/test")
-async def run_rignet():
-    try:
-        result = subprocess.run(
-            ["/usr/local/bin/python", "quick_start.py", "17872"],
-            cwd="/workspace/RigNet",
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return {
-            "status": "success",
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-        }
-    except subprocess.CalledProcessError as e:
-        return {
-            "status": "error",
-            "stdout": e.stdout,
-            "stderr": e.stderr,
-        }
