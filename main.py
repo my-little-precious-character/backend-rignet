@@ -88,19 +88,40 @@ async def root():
     return {"message": "welcome"}
 
 @app.post("/rigging")
-async def upload_image(file: UploadFile = File(...), mode: str = "prod"):
+async def upload_image(
+    obj: UploadFile = File(...),
+    mtl: UploadFile = File(...),
+    albedo: UploadFile = File(...),
+    prev_task_id: str = Form(...),
+    mode: str = "prod"):
     # Generate filename
-    task_id = uuid4().hex
-    file_extension = os.path.splitext(file.filename)[1]
-    file_path = os.path.join(UPLOAD_DIR, f"{task_id}{file_extension}")
+    task_id = prev_task_id
 
-    # Store file
-    with open(file_path, "wb") as buffer:
-        content = await file.read()
-        buffer.write(content)
+    # Save the .obj
+    obj_path  = os.path.join(UPLOAD_DIR, f"{task_id}_mesh.obj")
+    with open(obj_path, "wb") as f:
+        f.write(await obj.read())
+
+    # Save the .mtl
+    mtl_path  = os.path.join(UPLOAD_DIR, f"{task_id}_mesh.mtl")
+    with open(mtl_path, "wb") as f:
+        f.write(await mtl.read())
+
+    # Save the albedo texture
+    alb_path   = os.path.join(UPLOAD_DIR, f"{task_id}_mesh_albedo.mtl")
+    with open(alb_path, "wb") as f:
+        f.write(await albedo.read())
 
     task_type = TaskType.RIGGING if mode == "prod" else TaskType.RIGGING_TEST
-    task = TaskItem(id=task_id, type=task_type, data={"image_path": file_path})
+    task = TaskItem(
+        id=task_id,
+        type=task_type,
+        data={
+            "obj_path": obj_path,
+            "mtl_path": mtl_path,
+            "alb_path": alb_path,
+        }
+    )
     await task_queue.put(task)
     task_progress[task_id] = "queued"
 
