@@ -1,8 +1,14 @@
 import bpy
 import os
+import sys
 
-WORK_DIR = "/home/younghoc/capstone-data/backend-rignet-output-py"
-TASK_ID = "5fec2ff338fe467cb36cd7256fe7321f"
+argv = sys.argv
+if len(argv) < 2:
+    print("Usage: blender --background --python script.py -- <BASE_PATH> <MODEL_ID>")
+    sys.exit(1)
+
+WORK_DIR = argv[5] # "/home/younghoc/Downloads/capstone-data/quick_start"
+TASK_ID = argv[6]  # "17872"
 
 OBJ_PATH = os.path.join(WORK_DIR, f"{TASK_ID}_mesh.obj")
 RIG_PATH = os.path.join(WORK_DIR, f"{TASK_ID}_ori_rig.txt")
