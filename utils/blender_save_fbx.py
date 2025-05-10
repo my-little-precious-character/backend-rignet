@@ -164,7 +164,6 @@ def export_fbx(mesh_obj, arm_obj, filepath):
         add_leaf_bones=False,
         path_mode='COPY',
         embed_textures=True
-
     )
     print(f"Exported FBX to: {filepath}")
 
