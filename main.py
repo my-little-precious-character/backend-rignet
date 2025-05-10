@@ -72,7 +72,7 @@ async def handle_rigging(task):
 
         # Combind obj and rig result
         blender_proc = await asyncio.create_subprocess_exec(
-            "/blender/blender", "--background", "--python", "utils/blender_fbx.py", "--", "uploads", task.id,
+            "/blender/blender", "--background", "--python", "utils/blender_save_fbx.py", "--", "uploads", task.id,
             cwd="/app",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
