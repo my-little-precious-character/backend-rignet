@@ -162,7 +162,9 @@ def export_fbx(mesh_obj, arm_obj, filepath):
         object_types={'ARMATURE', 'MESH'},
         mesh_smooth_type='FACE',
         add_leaf_bones=False,
-        path_mode='AUTO'
+        path_mode='COPY',
+        embed_textures=True
+
     )
     print(f"Exported FBX to: {filepath}")
 
