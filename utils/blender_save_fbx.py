@@ -12,6 +12,7 @@ TASK_ID = argv[6]  # "17872"
 
 OBJ_PATH = os.path.join(WORK_DIR, f"{TASK_ID}_mesh.obj")
 RIG_PATH = os.path.join(WORK_DIR, f"{TASK_ID}_ori_rig.txt")
+FBX_PATH = os.path.join(WORK_DIR, f"{TASK_ID}.fbx")
 
 def cvt_coord(coord):
     a = coord[0]
@@ -141,6 +142,30 @@ def decimate_mesh_to_face_count(mesh_obj, target_faces=9000):
     new_faces = len(mesh_obj.data.polygons)
     print(f"[Decimate] 처리 후 면 수: {new_faces}")
 
+def export_fbx(mesh_obj, arm_obj, filepath):
+    # 1) Object Mode로 전환
+    if bpy.context.mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+    # 2) 필요한 객체만 선택
+    bpy.ops.object.select_all(action='DESELECT')
+    mesh_obj.select_set(True)
+    arm_obj.select_set(True)
+    bpy.context.view_layer.objects.active = arm_obj
+
+    # 3) FBX Export
+    bpy.ops.export_scene.fbx(
+        filepath=filepath,
+        use_selection=True,
+        apply_unit_scale=True,
+        bake_space_transform=True,
+        object_types={'ARMATURE', 'MESH'},
+        mesh_smooth_type='FACE',
+        add_leaf_bones=False,
+        path_mode='AUTO'
+    )
+    print(f"Exported FBX to: {filepath}")
+
 def main():
     try:
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -185,6 +210,8 @@ def main():
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+
+    export_fbx(mesh_obj, arm, FBX_PATH)
 
 if __name__ == "__main__":
     main()
