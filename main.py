@@ -90,6 +90,16 @@ async def handle_rigging(task):
         task_progress[task.id] = "error"
         print(f"[{task.id}] Exception: {e}")
 
+async def handle_rigging_test(task):
+    print("hi")
+    for i in range(100):
+        await asyncio.sleep(0.01)
+        task_progress[task.id] = f"processing ({(i + 1) * 1}%)"
+
+    src = os.path.join("results-sample", "luigi.fbx")
+    dst = os.path.join(UPLOAD_DIR, f"{task.id}.fbx")
+    shutil.copyfile(src, dst)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async def worker():
@@ -100,9 +110,7 @@ async def lifespan(app: FastAPI):
                 if task.type == TaskType.RIGGING:
                     await handle_rigging(task)
                 elif task.type == TaskType.RIGGING_TEST:
-                    for i in range(100):
-                        await asyncio.sleep(0.01)
-                        task_progress[task.id] = f"processing ({(i + 1) * 1}%)"
+                    await handle_rigging_test(task)
                 task_progress[task.id] = "done"
             except Exception as e:
                 task_progress[task.id] = f"error: {str(e)}"
