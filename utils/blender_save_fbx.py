@@ -26,9 +26,7 @@ def load_info(info_path):
 
     joint_pos = {}
     joint_hier = {}
-    skin_data = []
     root_name = None
-    root_pos = None
     with open(info_path, 'r') as f_info:
         for line in f_info:
             parts = line.strip().split()
@@ -46,17 +44,9 @@ def load_info(info_path):
                 if parent == child or (parent in joint_hier and child in joint_hier[parent]):
                     continue
                 joint_hier.setdefault(parent, []).append(child)
-            elif key == 'skin':
-                v_idx = int(parts[1])
-                weights = []
-                for i in range(2, len(parts), 2):
-                    bone = parts[i]
-                    weight = float(parts[i+1])
-                    weights.append((bone, weight))
-                skin_data.append((v_idx, weights))
-    return joint_pos, joint_hier, skin_data, root_name, root_pos
+    return joint_pos, joint_hier, root_name
 
-def create_joints(joint_pos, joint_hier, root_name, root_pos, arm_name="RigNetArmature"):
+def create_joints(joint_pos, joint_hier, root_name, arm_name="RigNetArmature"):
     # Create armature and enter edit mode
     bpy.ops.object.armature_add(enter_editmode=True)
     arm = bpy.context.active_object
@@ -262,6 +252,152 @@ def make_hand_foot(joint_pos, joint_hier):
 
     return joint_pos, joint_hier
 
+# 자식이 3개인 joints를 찾아서 up, down 배정
+def get_up_and_down(joint_pos, joint_hier):
+    children_count = {parent: len(children) for parent, children in joint_hier.items()}
+
+    three_children_joints = []
+    for parent, count in children_count.items():
+        if count == 3:
+            pos = joint_pos[parent]
+            dist = math.sqrt(pos[0]**2 + pos[1]**2 + pos[2]**2)
+            three_children_joints.append({'joint': parent, 'distance': dist})
+
+    three_children_joints = sorted(three_children_joints, key=lambda x: x['distance'])[:2]
+    if len(three_children_joints) != 2:
+        raise ValueError(f"자식이 3개인 본이 2개가 아닙니다: {len(three_children_joints)}개")
+
+    j0, j1 = three_children_joints[0], three_children_joints[1]
+    z0 = joint_pos[j0['joint']][2]
+    z1 = joint_pos[j1['joint']][2]
+    if z0 < z1:
+        down, up = j0['joint'], j1['joint']
+    else:
+        down, up = j1['joint'], j0['joint']
+
+    return up, down
+
+# down을 가랑이의 중심으로 조정
+def adjust_to_middle(joint_pos, joint_hier, down):
+    down_children = joint_hier.get(down, [])
+    two_lowest_children = sorted(down_children, key=lambda c: joint_pos[c][2])[:2]
+
+    p0 = joint_pos[two_lowest_children[0]]
+    p1 = joint_pos[two_lowest_children[1]]
+    midpoint = tuple((a + b) / 2 for a, b in zip(p0, p1))
+
+    joint_pos[down] = midpoint
+
+    return joint_pos
+
+from collections import defaultdict
+
+def re_root_tree(joint_hier, new_root):
+    # 1. 양방향 그래프 만들기
+    bi_graph = defaultdict(list)
+    for parent, children in joint_hier.items():
+        for child in children:
+            bi_graph[parent].append(child)
+            bi_graph[child].append(parent)
+    
+    # 2. new_root를 루트로 트리 구조 만들기 (DFS)
+    def build_tree(current, parent):
+        children = [node for node in bi_graph[current] if node != parent]
+        return {current: [build_tree(child, current) for child in children]} if children else {current: []}
+    
+    # 3. 트리 형태를 평평하게(원래 joint_hier 형태로) 정리
+    def flatten(tree):
+        result = {}
+        for k, v in tree.items():
+            result[k] = [list(child.keys())[0] for child in v]
+            for child in v:
+                result.update(flatten(child))
+        return result
+
+    tree = build_tree(new_root, None)
+    return flatten(tree)
+
+def insert_hips_spine_chest(joint_pos, joint_hier, up, down):
+    p_down = joint_pos[down]
+    p_up = joint_pos[up]
+    v = [p_up[i] - p_down[i] for i in range(3)]
+    p_hips = tuple(p_down[i] + v[i]/3 for i in range(3))
+    p_spine = tuple(p_down[i] + v[i]*2/3 for i in range(3))
+    p_chest = tuple(p_down[i] + v[i] for i in range(3))  # == p_up
+
+    hips_name = 'Hips'
+    spine_name = 'Spine'
+    chest_name = 'Chest'
+
+    # 2. down의 자식 목록에서 up 제거
+    down_children = joint_hier.get(down, [])
+    new_down_children = [c for c in down_children if c != up]
+    joint_hier[down] = new_down_children + [hips_name]  # 기존 자식 + Hips 추가
+
+    # 3. Hips → Spine → Chest → up
+    joint_hier[hips_name] = [spine_name]
+    joint_hier[spine_name] = [chest_name]
+    joint_hier[chest_name] = [up]
+
+    # 4. up의 모든 부모에서 up을 제거 (Chest가 부모가 됨)
+    for parent, children in joint_hier.items():
+        if parent != chest_name:
+            joint_hier[parent] = [c for c in children if c != up]
+
+    # 5. up의 기존 자식들은 그대로 둠 (joint_hier[up]을 변경하지 않음)
+
+    # 6. joint_pos에 새 joint 추가
+    joint_pos[hips_name] = p_hips
+    joint_pos[spine_name] = p_spine
+    joint_pos[chest_name] = p_chest  # == p_up
+
+    return joint_pos, joint_hier
+    
+def adjust_hips_spine_chest_neck(joint_pos, joint_hier):
+    up, down = get_up_and_down(joint_pos, joint_hier)
+    
+    # joint_pos = adjust_to_middle(joint_pos, joint_hier, down)
+    joint_pos = adjust_to_middle(joint_pos, joint_hier, up)
+
+    # 1. down을 root로 만들기
+    joint_hier = re_root_tree(joint_hier, down)
+
+    # 2. 3등분하기
+    joint_pos, joint_hier = insert_hips_spine_chest(joint_pos, joint_hier, up, down)
+
+    return joint_pos, joint_hier, down
+
+def insert_shoulder(joint_pos, joint_hier, side="Left"):
+    """
+    side: "Left" 또는 "Right"
+    """
+    # 키 이름 정하기
+    upper = f"{side}UpperArm"
+    lower = f"{side}LowerArm"
+    shoulder = f"{side}Shoulder"
+    chest = "Chest"
+
+    # 1. 좌표: Chest~UpperArm의 중간에 Shoulder 삽입
+    p_chest = joint_pos[chest]
+    p_upper = joint_pos[upper]
+    v = [p_upper[i] - p_chest[i] for i in range(3)]
+    p_shoulder = tuple(p_chest[i] + v[i] * 0.5 for i in range(3))
+    joint_pos[shoulder] = p_shoulder
+
+    # 2. Chest의 자식에서 UpperArm 제거, 대신 Shoulder 추가
+    joint_hier[chest] = [shoulder if c == upper else c for c in joint_hier.get(chest, [])]
+
+    # 3. Shoulder의 자식으로 UpperArm 등록
+    joint_hier[shoulder] = [upper]
+
+    # 4. UpperArm의 부모를 Shoulder로 변경 (다른 부모에서 UpperArm 제거)
+    for parent, children in joint_hier.items():
+        if parent != shoulder:
+            joint_hier[parent] = [c for c in children if c != upper]
+    # 5. UpperArm의 자식(보통 LowerArm)은 그대로 둠
+
+    return joint_pos, joint_hier
+
 def main():
     try:
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -290,7 +426,7 @@ def main():
     # Parse rig info
     if not os.path.isfile(RIG_PATH):
         raise FileNotFoundError(f"Rig info not found: {RIG_PATH}")
-    joint_pos, joint_hier, skin_data, root_name, root_pos = load_info(RIG_PATH)
+    joint_pos, joint_hier, root_name = load_info(RIG_PATH)
 
     # Rename bone
     lower_map = find_leaves(joint_hier, joint_pos)
@@ -300,13 +436,21 @@ def main():
     # Make hand and foot bones
     joint_pos, joint_hier = make_hand_foot(joint_pos, joint_hier)
 
+    # Adjust hips, spine, check, neck
+    joint_pos, joint_hier, root_name = adjust_hips_spine_chest_neck(joint_pos, joint_hier)
+
+    # Adjust shoulder
+    joint_hier["Chest"] = ["Neck", "RightUpperArm", "LeftUpperArm"]
+    joint_pos, joint_hier = insert_shoulder(joint_pos, joint_hier, side="Left")
+    joint_pos, joint_hier = insert_shoulder(joint_pos, joint_hier, side="Right")
+
     # Summary
-    print(f"Root joint: {root_name}, Position: {root_pos}")
+    print(f"Root joint: {root_name}")
     print(f"Total joints parsed: {len(joint_pos)}")
     print(f"Hierarchy links: {sum(len(v) for v in joint_hier.values())}")
 
     # Create joints
-    arm = create_joints(joint_pos, joint_hier, root_name, root_pos)
+    arm = create_joints(joint_pos, joint_hier, root_name)
 
     # Parent mesh to armature with automatic weights
     bpy.ops.object.select_all(action='DESELECT')
@@ -314,6 +458,10 @@ def main():
     arm.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
+
+    # Lift up
+    min_z = min(pos[2] for pos in joint_pos.values())
+    arm.location.z -= min_z
 
     export_fbx(mesh_obj, arm, FBX_PATH)
 
