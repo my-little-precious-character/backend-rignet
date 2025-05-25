@@ -167,6 +167,101 @@ def export_fbx(mesh_obj, arm_obj, filepath):
     )
     print(f"Exported FBX to: {filepath}")
 
+def find_leaves(joint_hier, joint_pos):
+    all_parents = set(joint_hier.keys())
+    all_children = set(child for children in joint_hier.values() for child in children)
+    leaves = all_children - all_parents
+
+
+    # arm
+    leftlowerarm = max(leaves, key=lambda x: joint_pos[x][0])
+    rightlowerarm = min(leaves, key=lambda x: joint_pos[x][0])
+
+    # leg
+    z_sorted_leaves = sorted(leaves, key=lambda x: joint_pos[x][2])
+    z_min_two = z_sorted_leaves[:2]
+    if joint_pos[z_min_two[0]][0] < joint_pos[z_min_two[1]][0]:
+        rightlowerleg = z_min_two[0]
+        leftlowerleg = z_min_two[1]
+    else:
+        leftlowerleg = z_min_two[0]
+        rightlowerleg = z_min_two[1]
+
+    # head
+    head = max(leaves, key=lambda x: joint_pos[x][2])
+
+    return {
+        'LeftLowerArm': leftlowerarm,
+        'RightLowerArm': rightlowerarm,
+        'LeftLowerLeg': leftlowerleg,
+        'RightLowerLeg': rightlowerleg,
+        'Head': head
+    }
+
+def find_arm_leg_neck(joint_hier, leaves):
+    child_to_parent = {child: parent for parent, children in joint_hier.items() for child in children}
+
+    leftupperarm = child_to_parent.get(leaves['LeftLowerArm'], None)
+    rightupperarm = child_to_parent.get(leaves['RightLowerArm'], None)
+    leftupperleg = child_to_parent.get(leaves['LeftLowerLeg'], None)
+    rightupperleg = child_to_parent.get(leaves['RightLowerLeg'], None)
+    neck = child_to_parent.get(leaves['Head'], None)
+
+    return {
+        'LeftUpperArm': leftupperarm,
+        'RightUpperArm': rightupperarm,
+        'LeftUpperLeg': leftupperleg,
+        'RightUpperLeg': rightupperleg,
+        'Neck': neck
+    }
+
+def apply_rename(joint_pos, joint_hier, lower_map, upper_map):
+    rename_dict = {}
+    for new_name, old_name in lower_map.items():
+        rename_dict[old_name] = new_name
+    for new_name, old_name in upper_map.items():
+        rename_dict[old_name] = new_name
+
+    joint_pos_renamed = {rename_dict.get(name, name): pos for name, pos in joint_pos.items()}
+
+    joint_hier_renamed = {}
+    for parent, children in joint_hier.items():
+        new_parent = rename_dict.get(parent, parent)
+        new_children = [rename_dict.get(child, child) for child in children]
+        joint_hier_renamed[new_parent] = new_children
+
+    return joint_pos_renamed, joint_hier_renamed
+
+def make_hand_foot(joint_pos, joint_hier):
+    lower_bones = {
+        'LeftHand': 'LeftLowerArm',
+        'RightHand': 'RightLowerArm',
+        'LeftFoot': 'LeftLowerLeg',
+        'RightFoot': 'RightLowerLeg'
+    }
+
+    for new_bone, lower_bone in lower_bones.items():
+        parent_bone = None
+        for parent, children in joint_hier.items():
+            if lower_bone in children:
+                parent_bone = parent
+                break
+        if parent_bone is None:
+            print(f"[Warning] {lower_bone}의 부모를 못찾음. pass")
+            continue
+
+        head = joint_pos[parent_bone]
+        tail = joint_pos[lower_bone]
+        direction = (tail[0] - head[0], tail[1] - head[1], tail[2] - head[2])
+        new_tail = (tail[0] + direction[0],
+                    tail[1] + direction[1],
+                    tail[2] + direction[2])
+
+        joint_pos[new_bone] = tuple(new_tail)
+        joint_hier.setdefault(lower_bone, []).append(new_bone)
+
+    return joint_pos, joint_hier
+
 def main():
     try:
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -196,6 +291,14 @@ def main():
     if not os.path.isfile(RIG_PATH):
         raise FileNotFoundError(f"Rig info not found: {RIG_PATH}")
     joint_pos, joint_hier, skin_data, root_name, root_pos = load_info(RIG_PATH)
+
+    # Rename bone
+    lower_map = find_leaves(joint_hier, joint_pos)
+    upper_map = find_arm_leg_neck(joint_hier, lower_map)
+    joint_pos, joint_hier = apply_rename(joint_pos, joint_hier, lower_map, upper_map)
+
+    # Make hand and foot bones
+    joint_pos, joint_hier = make_hand_foot(joint_pos, joint_hier)
 
     # Summary
     print(f"Root joint: {root_name}, Position: {root_pos}")
