@@ -1,6 +1,7 @@
 import bpy
 import os
 import sys
+import math
 
 argv = sys.argv
 if len(argv) < 2:
