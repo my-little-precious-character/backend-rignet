@@ -1,4 +1,5 @@
 import asyncio
+import math
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
@@ -39,7 +40,21 @@ task_progress: Dict[str, str] = {} # [task_id, queued | processing | done]
 ######## worker ########
 
 async def handle_rigging(task):
-    task_progress[task.id] = "processing (10%)"
+    start_time = asyncio.get_event_loop().time()
+    total_estimated_time = 120  # seconds
+    done_event = asyncio.Event()  # 완료 신호
+
+    async def update_progress_loop():
+        try:
+            while not done_event.is_set():
+                elapsed = asyncio.get_event_loop().time() - start_time
+                percent = min(100, math.sqrt(elapsed / total_estimated_time) * 100)
+                task_progress[task.id] = f"processing ({int(percent)}%)"
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            pass
+
+    progress_task = asyncio.create_task(update_progress_loop())
 
     try:
         # Copy obj file to rig
@@ -56,7 +71,6 @@ async def handle_rigging(task):
         )
 
         # Wait the subprocess
-        task_progress[task.id] = "processing (50%)"
         stdout, stderr = await proc.communicate()
 
         # Check exit code
@@ -77,7 +91,6 @@ async def handle_rigging(task):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        task_progress[task.id] = "processing (90%)"
         b_stdout, b_stderr = await blender_proc.communicate()
 
         # Check exit code
@@ -89,6 +102,10 @@ async def handle_rigging(task):
     except Exception as e:
         task_progress[task.id] = "error"
         print(f"[{task.id}] Exception: {e}")
+
+    finally:
+        done_event.set()
+        await progress_task
 
 async def handle_rigging_test(task):
     print("hi")
