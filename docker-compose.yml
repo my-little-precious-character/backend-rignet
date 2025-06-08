@@ -1,0 +1,10 @@
+services:
+  rignet:
+    image: rignet
+    build:
+      dockerfile: ./Dockerfile
+    container_name: rignet
+    ports:
+      - "7723:8000" # 호스트 7722 → 컨테이너 8000
+    restart: unless-stopped
+    tty: true
