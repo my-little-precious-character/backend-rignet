@@ -148,6 +148,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "https://my-character.cho0h5.org",
+        "http://my-little-precious-character.iptime.org:3000"
     ],
     allow_credentials=True,
     allow_methods=["*"],
